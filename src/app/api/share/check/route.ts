@@ -29,22 +29,6 @@ function extractDistrict(address: string): string | null {
   return null; // 구 정보가 없으면 null 반환
 }
 
-export async function GET(req: NextRequest, res: NextResponse) {
-  const { searchParams } = new URL(req.url);
-  const query = searchParams.get("query");
-
-  if (!query) {
-    return NextResponse.json(
-      { error: "쿼리 파라미터가 필요합니다." },
-      { status: 400 }
-    );
-  }
-
-  const found = searchEntries(stores, query);
-
-  return NextResponse.json({ results: found });
-}
-
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
