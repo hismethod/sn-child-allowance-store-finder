@@ -72,8 +72,8 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const input = body.content;
-    const responseType = body.type;
-    const searchMode = (body.searchMode as "strict" | "wide") || "strict";
+    const searchMode = (body.searchMode as "strict" | "wide") || "strict"; // searchMode body 파라미터에서 추출 (기존 코드 유지)
+    // const responseType = body.type; // responseType 파라미터 제거 (더 이상 사용하지 않음)
 
     let address = "";
     let storeName = "";
@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const topK = searchMode === "wide" ? 3 : 1; // **[NEW] searchMode에 따라 임계값 동적 설정**
+    const topK = searchMode === "wide" ? 3 : 1; // searchMode에 따른 topK 값 동적 설정 (기존 코드 유지)
     const searchResults = await db.query({
       topK: topK,
       vector: inputDescriptionEmbedding,
@@ -134,7 +134,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    let responseData: ApiResponse; // ApiResponse 타입 명시
+    let responseData: ApiResponse; // ApiResponse 타입 명시 (기존 코드 유지)
 
     let threshold = 0.85;
     if (searchMode === "wide") {
@@ -151,7 +151,7 @@ export async function POST(req: NextRequest) {
         isAffiliated: true,
         matchType: matchedStores.length === 1 ? "definitive" : "ambiguous",
         stores: matchedStores.map((store) => ({
-          // stores 배열로 통일
+          // stores 배열로 통일 (기존 코드 유지)
           name: store.name,
           category: store.category,
           address: store.address,
@@ -165,21 +165,19 @@ export async function POST(req: NextRequest) {
         isAffiliated: false,
         matchType: "none",
         message: "성남시 아동수당 가맹점을 찾을 수 없습니다.",
-        stores: [], // stores 빈 배열로 통일
+        stores: [], // stores 빈 배열로 통일 (기존 코드 유지)
         score: null,
       };
     }
 
-    const useTextUI = responseType === "text";
+    // **[NEW] 텍스트 UI 응답 생성 (항상 생성)**
+    const textResponse = createTextUIResponse(responseData);
 
-    if (useTextUI) {
-      const textResponse = createTextUIResponse(responseData);
-      return new NextResponse(textResponse, {
-        headers: { "Content-Type": "text/plain; charset=utf-8" },
-      });
-    } else {
-      return NextResponse.json(responseData); // JSON 응답 반환 (타입 명시 불필요)
-    }
+    // **[NEW] JSON 응답에 textUI 필드 추가, 구조화된 데이터(responseData)와 텍스트 UI(textResponse)를 함께 반환**
+    return NextResponse.json({
+      data: responseData, // 구조화된 데이터 (ApiResponse)
+      text: textResponse, // 텍스트 UI 응답
+    });
   } catch (error) {
     console.error("API 오류:", error);
     return NextResponse.json(
