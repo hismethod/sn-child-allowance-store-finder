@@ -2,13 +2,20 @@ import { Index } from "@upstash/vector";
 import OpenAI from "openai";
 import { NextResponse, NextRequest } from "next/server";
 
-interface Store {
-  id: string;
+interface ApiResponse {
+  success: boolean;
+  isAffiliated: boolean;
+  matchType: "definitive" | "ambiguous" | "none";
+  message: string;
+  stores: StoreResult[]; // StoreResult 배열로 변경
+  score: number | null;
+}
+
+interface StoreResult {
   name: string;
   category: string;
-  zipcode: number;
   address: string;
-  storeDescriptionEmbedding?: number[];
+  similarityScore: number;
 }
 
 const openai = new OpenAI({
@@ -33,14 +40,15 @@ async function getEmbedding(text: string): Promise<number[] | null> {
   }
 }
 
-function createTextUIResponse(responseData: any): string {
-  const { isDefinitiveMatch, matchType, store, stores, message, score } =
-    responseData;
+function createTextUIResponse(responseData: ApiResponse): string {
+  // ApiResponse 타입 적용
+  const { matchType, stores, message, score } = responseData; // stores, score 타입 변경
   let textResponse = "";
 
   if (matchType === "definitive") {
+    const store = stores[0]; // stores 배열에서 store 추출
     textResponse = `✅ 성남시 아동수당 가맹점입니다 (유사도: ${(
-      score * 100
+      score || 0 * 100
     ).toFixed(0)}%)\n\n⭐ ${store.name} (${store.category})\n📍 ${
       store.address
     }`;
@@ -49,7 +57,7 @@ function createTextUIResponse(responseData: any): string {
     stores.forEach((store, index) => {
       textResponse += `${index + 1}. ${store.name} (${store.category})\n   📍 ${
         store.address
-      }\n`;
+      } (유사도: ${(store.similarityScore * 100).toFixed(0)}%)\n`; // stores 요소에 유사도 추가
     });
     textResponse += `\n목록에서 확인해보셔야 합니다.`;
   } else if (matchType === "none") {
@@ -64,7 +72,9 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const input = body.content;
-    const searchMode = body.searchMode; // **[NEW] searchMode 파라미터 추출**
+    const responseType = body.type;
+    const searchMode = (body.searchMode as "strict" | "wide") || "strict";
+
     let address = "";
     let storeName = "";
 
@@ -124,30 +134,24 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    let responseData;
+    let responseData: ApiResponse; // ApiResponse 타입 명시
+
+    let threshold = 0.85;
+    if (searchMode === "wide") {
+      threshold = 0.7;
+    }
+
     const bestMatch = matchedStores.length > 0 ? matchedStores[0] : null;
     const similarityScore = bestMatch?.score || 0;
-    const strictThreshold = 0.85; // **[NEW] 엄격한 임계값**
-    const lenientThreshold = 0.7; // **[NEW] 관대한 임계값**
-    const threshold =
-      searchMode === "wide" ? lenientThreshold : strictThreshold; // **[NEW] searchMode에 따라 임계값 동적 설정**
 
     if (matchedStores.length > 0 && similarityScore >= threshold) {
       responseData = {
         success: true,
         message: "가맹점을 찾았습니다.",
-        isDefinitiveMatch: matchedStores.length === 1,
+        isAffiliated: true,
         matchType: matchedStores.length === 1 ? "definitive" : "ambiguous",
-        store:
-          matchedStores.length === 1
-            ? {
-                name: matchedStores[0].name,
-                category: matchedStores[0].category,
-                address: matchedStores[0].address,
-                similarityScore: parseFloat(similarityScore.toFixed(2)),
-              }
-            : undefined,
-        stores: matchedStores.slice(0, 5).map((store) => ({
+        stores: matchedStores.map((store) => ({
+          // stores 배열로 통일
           name: store.name,
           category: store.category,
           address: store.address,
@@ -161,23 +165,20 @@ export async function POST(req: NextRequest) {
         isAffiliated: false,
         matchType: "none",
         message: "성남시 아동수당 가맹점을 찾을 수 없습니다.",
-        stores: [],
+        stores: [], // stores 빈 배열로 통일
         score: null,
       };
     }
 
-    const useTextUI = body.type === "text";
+    const useTextUI = responseType === "text";
 
     if (useTextUI) {
-      const textResponse = createTextUIResponse({
-        ...responseData,
-        score: similarityScore,
-      });
+      const textResponse = createTextUIResponse(responseData);
       return new NextResponse(textResponse, {
         headers: { "Content-Type": "text/plain; charset=utf-8" },
       });
     } else {
-      return NextResponse.json(responseData);
+      return NextResponse.json(responseData); // JSON 응답 반환 (타입 명시 불필요)
     }
   } catch (error) {
     console.error("API 오류:", error);
