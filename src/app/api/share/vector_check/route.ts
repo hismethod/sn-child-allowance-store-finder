@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
     const searchMode = (body.searchMode as "strict" | "wide") || "strict"; // searchMode body 파라미터에서 추출 (기존 코드 유지)
     // const responseType = body.type; // responseType 파라미터 제거 (더 이상 사용하지 않음)
     console.log("req.header", req.headers);
-    console.log("req.body", req.body);
+    console.log("req.body", body);
 
     let address = "";
     let storeName = "";
