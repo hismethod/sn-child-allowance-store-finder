@@ -48,7 +48,7 @@ function createTextUIResponse(responseData: ApiResponse): string {
   if (matchType === "definitive") {
     const store = stores[0]; // stores 배열에서 store 추출
     textResponse = `✅ 성남시 아동수당 가맹점입니다 (유사도: ${(
-      score || 0 * 10000
+      (score || 0) * 100
     ).toFixed(0)}%)\n\n⭐ ${store.name} (${store.category})\n📍 ${
       store.address
     }`;
@@ -57,7 +57,7 @@ function createTextUIResponse(responseData: ApiResponse): string {
     stores.forEach((store, index) => {
       textResponse += `${index + 1}. ${store.name} (${store.category})\n   📍 ${
         store.address
-      } (유사도: ${(store.similarityScore * 10000).toFixed(0)}%)\n`; // stores 요소에 유사도 추가
+      } (유사도: ${(store.similarityScore * 100).toFixed(0)}%)\n`; // stores 요소에 유사도 추가
     });
     textResponse += `\n목록에서 확인해보셔야 합니다.`;
   } else if (matchType === "none") {
