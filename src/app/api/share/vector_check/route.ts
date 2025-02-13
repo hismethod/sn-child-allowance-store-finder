@@ -85,8 +85,8 @@ export async function POST(req: NextRequest) {
         address = lines[2].trim().replace("경기 성남시 ", "");
       } else if (input.startsWith("[카카오맵]")) {
         const lines = input.split("\n");
-        storeName = lines[1].trim();
-        address = lines[2].trim().replace("경기 성남시 ", "");
+        storeName = lines[0].replace("[카카오맵]", "").trim();
+        address = lines[1].trim().replace("경기 성남시 ", "");
       } else {
         address = input.trim().replace("경기 성남시 ", "");
       }
