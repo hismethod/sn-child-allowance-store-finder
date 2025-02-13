@@ -6,13 +6,13 @@ import { NextRequest, NextResponse } from "next/server";
 const nameFuseOptions = {
   keys: ["name"],
   includeScore: true,
-  threshold: 0.2,
+  threshold: 0.4,
 };
 
 const addressFuseOptions = {
   keys: ["address"],
   includeScore: true,
-  threshold: 0.1,
+  threshold: 0.2,
 };
 
 const nameFuse = new Fuse(stores, nameFuseOptions);
@@ -33,6 +33,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const inputText = body.content;
+    const responseType = body.type;
 
     if (!inputText) {
       return NextResponse.json(
@@ -49,6 +50,8 @@ export async function POST(req: NextRequest) {
     }
 
     const inputLines = inputText.split("\n");
+
+    console.log("inputLines", inputLines);
 
     let inputName = "";
     let inputAddress = "";
@@ -67,7 +70,11 @@ export async function POST(req: NextRequest) {
         }
       }
     }
+    inputAddress = inputAddress.replace("경기 성남시", "");
     inputAddress = inputAddress.trim();
+
+    console.log("inputName", inputName);
+    console.log("inputAddress", inputAddress);
 
     let matchedStores: Store[] = [];
     let nameSearchResults: FuseResult<Store>[] = [];
@@ -108,17 +115,55 @@ export async function POST(req: NextRequest) {
       matchedStores = [...new Set(matchedStores)]; // 중복 제거
     }
 
+    let responseData; // 응답 데이터를 담을 변수
+
     if (matchedStores.length > 0) {
-      return NextResponse.json({
-        success: true,
-        message: "가맹점을 찾았습니다.",
-        stores: matchedStores,
-      });
+      if (matchedStores.length === 1) {
+        responseData = {
+          success: true,
+          message: "가맹점을 찾았습니다.",
+          isDefinitiveMatch: true,
+          matchType: "definitive",
+          stores: matchedStores.map((store) => ({
+            name: store.name,
+            category: store.category,
+            address: store.address,
+          })),
+        };
+      } else {
+        responseData = {
+          success: true,
+          message: `여러 가맹점을 찾았습니다. 목록에서 확인해주세요. (총 ${matchedStores.length}곳)`,
+          isDefinitiveMatch: false,
+          matchType: "ambiguous",
+          stores: matchedStores.slice(0, 5).map((store) => ({
+            name: store.name,
+            category: store.category,
+            address: store.address,
+          })),
+        };
+      }
     } else {
-      return NextResponse.json(
-        { success: false, message: "가맹점을 찾을 수 없습니다." },
-        { status: 404 }
-      );
+      responseData = {
+        success: true,
+        isDefinitiveMatch: false,
+        matchType: "none",
+        message: "성남시 아동수당 가맹점을 찾을 수 없습니다.",
+        stores: [],
+      };
+    }
+
+    // 텍스트 UI 응답 여부 확인 (query parameter 또는 body에서 type=text 확인)
+    const useTextUI = responseType === "text"; // 또는 req.body 에서 확인
+
+    if (useTextUI) {
+      const textResponse = createTextUIResponse(responseData);
+      return new NextResponse(textResponse, {
+        headers: { "Content-Type": "text/plain; charset=utf-8" },
+      }); // text/plain 응답
+    } else {
+      // 기존 JSON 응답
+      return NextResponse.json(responseData);
     }
   } catch (error) {
     console.error("API error:", error);
@@ -127,4 +172,27 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+function createTextUIResponse(responseData: any): string {
+  const { isDefinitiveMatch, matchType, stores, message } = responseData;
+  let textResponse = "";
+
+  if (matchType === "definitive") {
+    const store = stores[0];
+    textResponse = `✅ 성남시 아동수당 가맹점입니다\n\n⭐ ${store.name} (${store.category})\n📍 ${store.address}`;
+  } else if (matchType === "ambiguous") {
+    textResponse = `🤔 여러 가맹점이 검색되었습니다 (${stores.length}곳)\n\n`;
+    stores.forEach((store, index) => {
+      textResponse += `${index + 1}. ${store.name} (${store.category})\n   📍 ${
+        store.address
+      }\n`;
+    });
+    textResponse += `\n목록에서 확인해보셔야 합니다.`;
+  } else if (matchType === "none") {
+    textResponse = `❌ 가맹점을 찾을 수 없습니다.\n\n성남시 아동수당 가맹점이 아니거나, 등록되지 않은 가게입니다.`;
+  } else {
+    textResponse = message; // 기본 메시지 또는 에러 메시지
+  }
+  return textResponse;
 }
