@@ -174,8 +174,22 @@ export async function POST(req: NextRequest) {
   }
 }
 
-function createTextUIResponse(responseData: any): string {
-  const { isDefinitiveMatch, matchType, stores, message } = responseData;
+interface StoreResult {
+  name: string;
+  category: string;
+  address: string;
+}
+
+interface ApiResponse {
+  success: boolean;
+  matchType: string;
+  isDefinitiveMatch: boolean;
+  message: string;
+  stores: StoreResult[];
+}
+
+function createTextUIResponse(responseData: ApiResponse): string {
+  const { matchType, stores, message } = responseData;
   let textResponse = "";
 
   if (matchType === "definitive") {
