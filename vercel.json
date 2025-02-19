@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/((?!api/).*)",
+      "destination": "https://moon.jungmin.me"
+    }
+  ]
+}
