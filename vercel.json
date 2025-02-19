@@ -1,8 +1,16 @@
 {
-  "rewrites": [
+  "redirects": [
     {
-      "source": "/((?!api/).*)",
-      "destination": "https://moon.jungmin.me"
+      "source": "/(.*)",
+      "destination": "https://moon.jungmin.me",
+      "permanent": false,
+      "has": [
+        {
+          "type": "header",
+          "key": "x-vercel-path",
+          "value": "/api/*"
+        }
+      ]
     }
   ]
 }
